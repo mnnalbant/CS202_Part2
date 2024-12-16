@@ -82,7 +82,7 @@ public class HousekeepingOperations {
                 SELECT HS.scheduleID, HS.scheduled_time, R.room_no 
                 FROM HousekeepingSchedule HS 
                 JOIN Room R ON HS.roomID = R.roomID 
-                WHERE HS.status = 'completed' 
+                WHERE HS.status = 'complete' 
                 AND HS.housekeeperID = ?
                 ORDER BY HS.scheduled_time DESC
             """;
@@ -136,8 +136,7 @@ public class HousekeepingOperations {
             
             String updateSchedule = """
                 UPDATE HousekeepingSchedule
-                SET status = 'completed',
-                    completed_time = CURRENT_TIMESTAMP 
+                SET status = 'complete'
                 WHERE scheduleID = ?
                 AND housekeeperID = ?
                 AND status = 'incomplete'

@@ -22,25 +22,31 @@ public class GuestOperations {
                 JOptionPane.showMessageDialog(null, "Invalid choice");
         }
     }
-
     private static void addNewBooking(Connection conn) throws SQLException {
         try {
             String guestIdStr = JOptionPane.showInputDialog("Enter guest ID:");
             int guestId = Integer.parseInt(guestIdStr);
-
+    
+            String roomIdStr = JOptionPane.showInputDialog("Enter room ID:");
+            int roomId = Integer.parseInt(roomIdStr);
+    
             String checkInDate = JOptionPane.showInputDialog("Enter check-in date (YYYY-MM-DD):");
             String checkOutDate = JOptionPane.showInputDialog("Enter check-out date (YYYY-MM-DD):");
             String numberOfGuestsStr = JOptionPane.showInputDialog("Enter number of guests:");
             int numberOfGuests = Integer.parseInt(numberOfGuestsStr);
-
+    
             // Generate a new booking ID
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery("SELECT MAX(bookingID) + 1 FROM Booking");
             int bookingId = rs.next() ? rs.getInt(1) : 1;
-
+    
+            // Generate a new payment ID
+            rs = stmt.executeQuery("SELECT MAX(paymentID) + 1 FROM Payment");
+            int paymentId = rs.next() ? rs.getInt(1) : 1;
+    
             // Start transaction
             conn.setAutoCommit(false);
-
+    
             // Insert booking
             String insertBooking = "INSERT INTO Booking (bookingID, guestID, check_in_date, check_out_date, booking_date, number_of_guests) VALUES (?, ?, ?, ?, CURRENT_DATE, ?)";
             PreparedStatement pstmt = conn.prepareStatement(insertBooking);
@@ -50,16 +56,30 @@ public class GuestOperations {
             pstmt.setString(4, checkOutDate);
             pstmt.setInt(5, numberOfGuests);
             pstmt.executeUpdate();
-
+    
             // Insert into ManagedBy
             String insertManagedBy = "INSERT INTO ManagedBy (bookingID, receptionistID, status) VALUES (?, NULL, 'pending')";
             pstmt = conn.prepareStatement(insertManagedBy);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
-
+    
+            // Insert into BookedRooms
+            String insertBookedRooms = "INSERT INTO BookedRooms (roomID, bookingID) VALUES (?, ?)";
+            pstmt = conn.prepareStatement(insertBookedRooms);
+            pstmt.setInt(1, roomId);
+            pstmt.setInt(2, bookingId);
+            pstmt.executeUpdate();
+    
+            // Insert initial payment record with pending status only
+            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')";
+            pstmt = conn.prepareStatement(insertPayment);
+            pstmt.setInt(1, paymentId);
+            pstmt.setInt(2, bookingId);
+            pstmt.executeUpdate();
+    
             conn.commit();
-            JOptionPane.showMessageDialog(null, "Booking created successfully! Booking ID: " + bookingId);
-
+            JOptionPane.showMessageDialog(null, "Booking created successfully! Booking ID: " + bookingId + ", Payment ID: " + paymentId);
+    
         } catch (Exception e) {
             conn.rollback();
             JOptionPane.showMessageDialog(null, "Error creating booking: " + e.getMessage());
@@ -86,7 +106,7 @@ public class GuestOperations {
                     FROM BookedRooms br
                     JOIN Booking b ON br.bookingID = b.bookingID
                     JOIN ManagedBy mb ON b.bookingID = mb.bookingID
-                    WHERE mb.status NOT IN ('denied', 'canceled')
+                    WHERE mb.status NOT IN ('denied', 'cancelled')
                     AND (
                         (b.check_in_date BETWEEN ? AND ?)
                         OR (b.check_out_date BETWEEN ? AND ?)
@@ -131,7 +151,7 @@ public class GuestOperations {
         try {
             String guestIdStr = JOptionPane.showInputDialog("Enter your guest ID:");
             int guestId = Integer.parseInt(guestIdStr);
-
+    
             String query = """
                 SELECT 
                     b.bookingID,
@@ -142,13 +162,13 @@ public class GuestOperations {
                     b.check_out_date,
                     b.booking_date,
                     b.number_of_guests,
-                    p.payment_status
+                    COALESCE(p.payment_status, 'Unpaid') as payment_status
                 FROM Booking b
                 JOIN BookedRooms br ON b.bookingID = br.bookingID
                 JOIN Room r ON br.roomID = r.roomID
                 JOIN Hotel h ON r.hotelID = h.hotelID
                 JOIN RoomType rt ON r.typeID = rt.typeID
-                JOIN Payment p ON b.bookingID = p.bookingID
+                LEFT JOIN Payment p ON b.bookingID = p.bookingID
                 WHERE b.guestID = ?
                 GROUP BY 
                     b.bookingID,
@@ -160,16 +180,16 @@ public class GuestOperations {
                     p.payment_status
                 ORDER BY b.check_in_date DESC
             """;
-
+    
             PreparedStatement pstmt = conn.prepareStatement(query);
             pstmt.setInt(1, guestId);
             ResultSet rs = pstmt.executeQuery();
-
+    
             StringBuilder output = new StringBuilder("\nYour Bookings:\n");
             output.append(String.format("%-8s %-20s %-15s %-15s %-12s %-12s %-8s %-10s%n",
                 "ID", "Hotel", "Rooms", "Room Types", "Check In", "Check Out", "Guests", "Status"));
             output.append("-".repeat(100)).append("\n");
-
+    
             while (rs.next()) {
                 output.append(String.format("%-8d %-20s %-15s %-15s %-12s %-12s %-8d %-10s%n",
                     rs.getInt("bookingID"),
@@ -181,14 +201,14 @@ public class GuestOperations {
                     rs.getInt("number_of_guests"),
                     rs.getString("payment_status")));
             }
-
+    
             JOptionPane.showMessageDialog(null, output.toString());
-
+    
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "Error viewing bookings: " + e.getMessage());
         }
     }
-
+    
     private static void cancelBooking(Connection conn) throws SQLException {
         try {
             String guestIdStr = JOptionPane.showInputDialog("Enter your guest ID:");
@@ -200,7 +220,7 @@ public class GuestOperations {
             // Start transaction
             conn.setAutoCommit(false);
 
-            // Check if booking exists and can be canceled
+            // Check if booking exists and can be cancelled
             String checkQuery = """
                 SELECT b.bookingID 
                 FROM Booking b
@@ -216,13 +236,13 @@ public class GuestOperations {
             ResultSet rs = pstmt.executeQuery();
 
             if (!rs.next()) {
-                JOptionPane.showMessageDialog(null, "Booking not found or cannot be canceled.");
+                JOptionPane.showMessageDialog(null, "Booking not found or cannot be cancelled.");
                 conn.rollback();
                 return;
             }
 
             // Update ManagedBy status
-            String updateManagedBy = "UPDATE ManagedBy SET status = 'canceled' WHERE bookingID = ?";
+            String updateManagedBy = "UPDATE ManagedBy SET status = 'cancelled' WHERE bookingID = ?";
             pstmt = conn.prepareStatement(updateManagedBy);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
@@ -238,14 +258,14 @@ public class GuestOperations {
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
 
-            // Delete BookedRooms entries
-            String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
-            pstmt = conn.prepareStatement(deleteBookedRooms);
-            pstmt.setInt(1, bookingId);
-            pstmt.executeUpdate();
+            // Delete BookedRooms entries (we may not need this)
+           // String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
+           // pstmt = conn.prepareStatement(deleteBookedRooms);
+            //pstmt.setInt(1, bookingId);
+            //pstmt.executeUpdate();
 
             conn.commit();
-            JOptionPane.showMessageDialog(null, "Booking canceled successfully!");
+            JOptionPane.showMessageDialog(null, "Booking cancelled successfully!");
 
         } catch (Exception e) {
             conn.rollback();

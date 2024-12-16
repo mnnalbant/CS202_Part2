@@ -52,6 +52,10 @@ public class ReceptionistOperations {
             ResultSet rs = stmt.executeQuery("SELECT MAX(bookingID) + 1 FROM Booking");
             int bookingId = rs.next() ? rs.getInt(1) : 1;
             
+            // Generate new payment ID
+            rs = stmt.executeQuery("SELECT MAX(paymentID) + 1 FROM Payment");
+            int paymentId = rs.next() ? rs.getInt(1) : 1;
+            
             // Insert booking
             String insertBooking = """
                 INSERT INTO Booking (bookingID, guestID, check_in_date, check_out_date, 
@@ -83,8 +87,15 @@ public class ReceptionistOperations {
             pstmt.setInt(2, bookingId);
             pstmt.executeUpdate();
             
+            // Insert initial payment record with pending status only
+            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')";
+            pstmt = conn.prepareStatement(insertPayment);
+            pstmt.setInt(1, paymentId);
+            pstmt.setInt(2, bookingId);
+            pstmt.executeUpdate();
+            
             conn.commit();
-            JOptionPane.showMessageDialog(null, "Booking created successfully! Booking ID: " + bookingId);
+            JOptionPane.showMessageDialog(null, "Booking created successfully!\nBooking ID: " + bookingId + "\nPayment ID: " + paymentId);
             
         } catch (Exception e) {
             conn.rollback();
@@ -98,39 +109,68 @@ public class ReceptionistOperations {
         try {
             String paymentIdStr = JOptionPane.showInputDialog("Enter payment ID:");
             int paymentId = Integer.parseInt(paymentIdStr);
+     
+            // Get booking details and calculate payment amount
+            String amountQuery = """
+                SELECT rt.price_per_night, 
+                       DATEDIFF(b.check_out_date, b.check_in_date) as stay_duration
+                FROM Payment p
+                JOIN Booking b ON p.bookingID = b.bookingID
+                JOIN BookedRooms br ON b.bookingID = br.bookingID
+                JOIN Room r ON br.roomID = r.roomID
+                JOIN RoomType rt ON r.typeID = rt.typeID
+                WHERE p.paymentID = ? AND p.payment_status = 'pending'
+            """;
+            PreparedStatement amountPstmt = conn.prepareStatement(amountQuery);
+            amountPstmt.setInt(1, paymentId);
+            ResultSet rs = amountPstmt.executeQuery();
+     
+            if (!rs.next()) {
+                JOptionPane.showMessageDialog(null, "Payment not found or already processed.");
+                return;
+            }
+     
+            double basePrice = rs.getDouble("price_per_night");
+            int stayDuration = rs.getInt("stay_duration");
+            double totalAmount = basePrice * stayDuration;
             
             String transactionId = JOptionPane.showInputDialog("Enter transaction ID:");
-            String paymentMethod = JOptionPane.showInputDialog("Enter payment method:");
+            String paymentMethod = JOptionPane.showInputDialog("Enter payment method (credit_card/debit_card/cash/bank_transfer):");
             
             String query = """
                 UPDATE Payment 
                 SET payment_status = 'confirmed',
                     transactionID = ?,
                     payment_date = CURRENT_DATE,
-                    payment_method = ?
+                    payment_method = ?,
+                    payment_amount = ?
                 WHERE paymentID = ? AND payment_status = 'pending'
             """;
             
             PreparedStatement pstmt = conn.prepareStatement(query);
             pstmt.setString(1, transactionId);
             pstmt.setString(2, paymentMethod);
-            pstmt.setInt(3, paymentId);
+            pstmt.setDouble(3, totalAmount);
+            pstmt.setInt(4, paymentId);
             
             int updated = pstmt.executeUpdate();
             if (updated > 0) {
-                JOptionPane.showMessageDialog(null, "Payment processed successfully!");
+                JOptionPane.showMessageDialog(null, String.format("Payment processed successfully!\nTotal Amount: $%.2f", totalAmount));
             } else {
                 JOptionPane.showMessageDialog(null, "Payment not found or already processed.");
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "Error processing payment: " + e.getMessage());
         }
-    }
+     }
 
     private static void modifyBooking(Connection conn) throws SQLException {
         try {
             String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to modify:");
             int bookingId = Integer.parseInt(bookingIdStr);
+            
+            String receptionistIdStr = JOptionPane.showInputDialog("Enter receptionist ID handling this booking:");
+            Integer receptionistId = receptionistIdStr.isEmpty() ? null : Integer.parseInt(receptionistIdStr);
             
             // Show current booking details
             JOptionPane.showMessageDialog(null, "Leave blank if no change is needed for the following fields:");
@@ -152,7 +192,8 @@ public class ReceptionistOperations {
                     b.check_in_date = COALESCE(?, b.check_in_date),
                     b.check_out_date = COALESCE(?, b.check_out_date),
                     b.number_of_guests = COALESCE(?, b.number_of_guests),
-                    mb.status = COALESCE(?, mb.status)
+                    mb.status = COALESCE(?, mb.status),
+                    mb.receptionistID = COALESCE(?, mb.receptionistID)
                 WHERE b.bookingID = ?
                 AND mb.status NOT IN ('checked_in', 'checked_out')
             """;
@@ -163,9 +204,19 @@ public class ReceptionistOperations {
             pstmt.setString(3, checkOutDate.isEmpty() ? null : checkOutDate);
             pstmt.setObject(4, numberOfGuests);
             pstmt.setString(5, status.isEmpty() ? null : status);
-            pstmt.setInt(6, bookingId);
+            pstmt.setObject(6, receptionistId);  // Allow null if empty string entered
+            pstmt.setInt(7, bookingId);
             
             int updated = pstmt.executeUpdate();
+
+            // If status is changed to cancelled, delete BookedRooms entries
+            //if (!status.isEmpty() && status.equalsIgnoreCase("cancelled")) {
+            //    String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
+            //    pstmt = conn.prepareStatement(deleteBookedRooms);
+            //    pstmt.setInt(1, bookingId);
+            //    pstmt.executeUpdate();
+            //}
+            //conn.commit();
             if (updated > 0) {
                 JOptionPane.showMessageDialog(null, "Booking modified successfully!");
             } else {
@@ -174,6 +225,7 @@ public class ReceptionistOperations {
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "Error modifying booking: " + e.getMessage());
         }
+        
     }
 
     private static void deleteBooking(Connection conn) throws SQLException {
