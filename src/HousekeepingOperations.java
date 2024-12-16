@@ -1,8 +1,7 @@
 import java.sql.*;
-import java.util.Scanner;
+import javax.swing.*;
 
 public class HousekeepingOperations {
-    private static final Scanner scanner = new Scanner(System.in);
     
     public static void handleHousekeepingChoice(int choice, Connection conn) throws SQLException {
         switch (choice) {
@@ -19,17 +18,17 @@ public class HousekeepingOperations {
                 viewCleaningSchedule(conn);
                 break;
             default:
-                System.out.println("Invalid choice");
+                JOptionPane.showMessageDialog(null, "Invalid choice");
         }
     }
 
     private static void viewPendingTasks(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter your housekeeper ID: ");
-            int housekeeperId = Integer.parseInt(scanner.nextLine());
+            String housekeeperIdStr = JOptionPane.showInputDialog("Enter your housekeeper ID:");
+            int housekeeperId = Integer.parseInt(housekeeperIdStr);
             
             if (!validateHousekeeperId(conn, housekeeperId)) {
-                System.out.println("Invalid housekeeper ID or user is not a housekeeper.");
+                JOptionPane.showMessageDialog(null, "Invalid housekeeper ID or user is not a housekeeper.");
                 return;
             }
             
@@ -47,34 +46,35 @@ public class HousekeepingOperations {
             
             ResultSet rs = pstmt.executeQuery();
             
-            System.out.println("\nPending Tasks:");
-            System.out.printf("%-12s %-20s %-10s%n", "Schedule ID", "Scheduled Time", "Room No");
-            System.out.println("-".repeat(50));
+            StringBuilder output = new StringBuilder("\nPending Tasks:\n");
+            output.append(String.format("%-12s %-20s %-10s%n", "Schedule ID", "Scheduled Time", "Room No"));
+            output.append("-".repeat(50)).append("\n");
             
             boolean hasRecords = false;
             while (rs.next()) {
                 hasRecords = true;
-                System.out.printf("%-12d %-20s %-10s%n",
+                output.append(String.format("%-12d %-20s %-10s%n",
                     rs.getInt("scheduleID"),
                     rs.getTimestamp("scheduled_time"),
-                    rs.getString("room_no"));
+                    rs.getString("room_no")));
             }
             
             if (!hasRecords) {
-                System.out.println("No pending tasks found.");
+                output.append("No pending tasks found.");
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing pending tasks: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing pending tasks: " + e.getMessage());
         }
     }
 
     private static void viewCompletedTasks(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter your housekeeper ID: ");
-            int housekeeperId = Integer.parseInt(scanner.nextLine());
+            String housekeeperIdStr = JOptionPane.showInputDialog("Enter your housekeeper ID:");
+            int housekeeperId = Integer.parseInt(housekeeperIdStr);
             
             if (!validateHousekeeperId(conn, housekeeperId)) {
-                System.out.println("Invalid housekeeper ID or user is not a housekeeper.");
+                JOptionPane.showMessageDialog(null, "Invalid housekeeper ID or user is not a housekeeper.");
                 return;
             }
             
@@ -82,7 +82,7 @@ public class HousekeepingOperations {
                 SELECT HS.scheduleID, HS.scheduled_time, R.room_no 
                 FROM HousekeepingSchedule HS 
                 JOIN Room R ON HS.roomID = R.roomID 
-                WHERE HS.status = 'completed' 
+                WHERE HS.status = 'complete' 
                 AND HS.housekeeperID = ?
                 ORDER BY HS.scheduled_time DESC
             """;
@@ -92,51 +92,51 @@ public class HousekeepingOperations {
             
             ResultSet rs = pstmt.executeQuery();
             
-            System.out.println("\nCompleted Tasks:");
-            System.out.printf("%-12s %-20s %-10s%n", "Schedule ID", "Scheduled Time", "Room No");
-            System.out.println("-".repeat(50));
+            StringBuilder output = new StringBuilder("\nCompleted Tasks:\n");
+            output.append(String.format("%-12s %-20s %-10s%n", "Schedule ID", "Scheduled Time", "Room No"));
+            output.append("-".repeat(50)).append("\n");
             
             boolean hasRecords = false;
             while (rs.next()) {
                 hasRecords = true;
-                System.out.printf("%-12d %-20s %-10s%n",
+                output.append(String.format("%-12d %-20s %-10s%n",
                     rs.getInt("scheduleID"),
                     rs.getTimestamp("scheduled_time"),
-                    rs.getString("room_no"));
+                    rs.getString("room_no")));
             }
             
             if (!hasRecords) {
-                System.out.println("No completed tasks found.");
+                output.append("No completed tasks found.");
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing completed tasks: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing completed tasks: " + e.getMessage());
         }
     }
 
     private static void updateTaskStatus(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter your housekeeper ID: ");
-            int housekeeperId = Integer.parseInt(scanner.nextLine());
+            conn.setAutoCommit(false);
+
+            String housekeeperIdStr = JOptionPane.showInputDialog("Enter your housekeeper ID:");
+            int housekeeperId = Integer.parseInt(housekeeperIdStr);
             
             if (!validateHousekeeperId(conn, housekeeperId)) {
-                System.out.println("Invalid housekeeper ID or user is not a housekeeper.");
+                JOptionPane.showMessageDialog(null, "Invalid housekeeper ID or user is not a housekeeper.");
                 return;
             }
             
-            System.out.print("Enter schedule ID: ");
-            int scheduleId = Integer.parseInt(scanner.nextLine());
+            String scheduleIdStr = JOptionPane.showInputDialog("Enter schedule ID:");
+            int scheduleId = Integer.parseInt(scheduleIdStr);
             
             if (!validateScheduleId(conn, scheduleId, housekeeperId)) {
-                System.out.println("Invalid schedule ID or task is not assigned to you.");
+                JOptionPane.showMessageDialog(null, "Invalid schedule ID or task is not assigned to you.");
                 return;
             }
-            
-            conn.setAutoCommit(false);
-            
+                        
             String updateSchedule = """
                 UPDATE HousekeepingSchedule
-                SET status = 'completed',
-                    completed_time = CURRENT_TIMESTAMP 
+                SET status = 'complete'
                 WHERE scheduleID = ?
                 AND housekeeperID = ?
                 AND status = 'incomplete'
@@ -164,14 +164,14 @@ public class HousekeepingOperations {
                 pstmt.executeUpdate();
                 
                 conn.commit();
-                System.out.println("Task marked as completed successfully!");
+                JOptionPane.showMessageDialog(null, "Task marked as completed successfully!");
             } else {
-                System.out.println("Task not found or already completed.");
+                JOptionPane.showMessageDialog(null, "Task not found or already completed.");
                 conn.rollback();
             }
         } catch (Exception e) {
             conn.rollback();
-            System.out.println("Error updating task status: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error updating task status: " + e.getMessage());
         } finally {
             conn.setAutoCommit(true);
         }
@@ -179,11 +179,11 @@ public class HousekeepingOperations {
 
     private static void viewCleaningSchedule(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter your housekeeper ID: ");
-            int housekeeperId = Integer.parseInt(scanner.nextLine());
+            String housekeeperIdStr = JOptionPane.showInputDialog("Enter your housekeeper ID:");
+            int housekeeperId = Integer.parseInt(housekeeperIdStr);
             
             if (!validateHousekeeperId(conn, housekeeperId)) {
-                System.out.println("Invalid housekeeper ID or user is not a housekeeper.");
+                JOptionPane.showMessageDialog(null, "Invalid housekeeper ID or user is not a housekeeper.");
                 return;
             }
             
@@ -200,26 +200,27 @@ public class HousekeepingOperations {
             
             ResultSet rs = pstmt.executeQuery();
             
-            System.out.println("\nCleaning Schedule:");
-            System.out.printf("%-12s %-20s %-15s %-10s%n", 
-                "Schedule ID", "Scheduled Time", "Status", "Room No");
-            System.out.println("-".repeat(60));
+            StringBuilder output = new StringBuilder("\nCleaning Schedule:\n");
+            output.append(String.format("%-12s %-20s %-15s %-10s%n", 
+                "Schedule ID", "Scheduled Time", "Status", "Room No"));
+            output.append("-".repeat(60)).append("\n");
             
             boolean hasRecords = false;
             while (rs.next()) {
                 hasRecords = true;
-                System.out.printf("%-12d %-20s %-15s %-10s%n",
+                output.append(String.format("%-12d %-20s %-15s %-10s%n",
                     rs.getInt("scheduleID"),
                     rs.getTimestamp("scheduled_time"),
                     rs.getString("status"),
-                    rs.getString("room_no"));
+                    rs.getString("room_no")));
             }
             
             if (!hasRecords) {
-                System.out.println("No scheduled tasks found.");
+                output.append("No scheduled tasks found.");
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing cleaning schedule: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing cleaning schedule: " + e.getMessage());
         }
     }
 

@@ -1,8 +1,7 @@
 import java.sql.*;
-import java.util.Scanner;
+import javax.swing.*;
 
 public class ReceptionistOperations {
-    private static final Scanner scanner = new Scanner(System.in);
     
     public static void handleReceptionistChoice(int choice, Connection conn) throws SQLException {
         switch (choice) {
@@ -28,7 +27,7 @@ public class ReceptionistOperations {
                 viewHousekeepersRecords(conn);
                 break;
             default:
-                System.out.println("Invalid choice");
+                JOptionPane.showMessageDialog(null, "Invalid choice");
         }
     }
 
@@ -36,28 +35,26 @@ public class ReceptionistOperations {
         try {
             conn.setAutoCommit(false);
             
-            System.out.print("Enter guest ID: ");
-            int guestId = Integer.parseInt(scanner.nextLine());
+            String guestIdStr = JOptionPane.showInputDialog("Enter guest ID:");
+            int guestId = Integer.parseInt(guestIdStr);
             
-            System.out.print("Enter check-in date (YYYY-MM-DD): ");
-            String checkInDate = scanner.nextLine();
-            
-            System.out.print("Enter check-out date (YYYY-MM-DD): ");
-            String checkOutDate = scanner.nextLine();
-            
-            System.out.print("Enter number of guests: ");
-            int numberOfGuests = Integer.parseInt(scanner.nextLine());
-            
-            System.out.print("Enter room ID: ");
-            int roomId = Integer.parseInt(scanner.nextLine());
-            
-            System.out.print("Enter receptionist ID: ");
-            int receptionistId = Integer.parseInt(scanner.nextLine());
+            String checkInDate = JOptionPane.showInputDialog("Enter check-in date (YYYY-MM-DD):");
+            String checkOutDate = JOptionPane.showInputDialog("Enter check-out date (YYYY-MM-DD):");
+            String numberOfGuestsStr = JOptionPane.showInputDialog("Enter number of guests:");
+            int numberOfGuests = Integer.parseInt(numberOfGuestsStr);
+            String roomIdStr = JOptionPane.showInputDialog("Enter room ID:");
+            int roomId = Integer.parseInt(roomIdStr);
+            String receptionistIdStr = JOptionPane.showInputDialog("Enter receptionist ID:");
+            int receptionistId = Integer.parseInt(receptionistIdStr);
             
             // Generate new booking ID
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery("SELECT MAX(bookingID) + 1 FROM Booking");
             int bookingId = rs.next() ? rs.getInt(1) : 1;
+            
+            // Generate new payment ID
+            rs = stmt.executeQuery("SELECT MAX(paymentID) + 1 FROM Payment");
+            int paymentId = rs.next() ? rs.getInt(1) : 1;
             
             // Insert booking
             String insertBooking = """
@@ -90,12 +87,19 @@ public class ReceptionistOperations {
             pstmt.setInt(2, bookingId);
             pstmt.executeUpdate();
             
+            // Insert initial payment record with pending status only
+            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')";
+            pstmt = conn.prepareStatement(insertPayment);
+            pstmt.setInt(1, paymentId);
+            pstmt.setInt(2, bookingId);
+            pstmt.executeUpdate();
+            
             conn.commit();
-            System.out.println("Booking created successfully! Booking ID: " + bookingId);
+            JOptionPane.showMessageDialog(null, "Booking created successfully!\nBooking ID: " + bookingId + "\nPayment ID: " + paymentId);
             
         } catch (Exception e) {
             conn.rollback();
-            System.out.println("Error creating booking: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error creating booking: " + e.getMessage());
         } finally {
             conn.setAutoCommit(true);
         }
@@ -103,64 +107,82 @@ public class ReceptionistOperations {
 
     private static void processPayment(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter payment ID: ");
-            int paymentId = Integer.parseInt(scanner.nextLine());
+            String paymentIdStr = JOptionPane.showInputDialog("Enter payment ID:");
+            int paymentId = Integer.parseInt(paymentIdStr);
+     
+            // Get booking details and calculate payment amount
+            String amountQuery = """
+                SELECT rt.price_per_night, 
+                       DATEDIFF(b.check_out_date, b.check_in_date) as stay_duration
+                FROM Payment p
+                JOIN Booking b ON p.bookingID = b.bookingID
+                JOIN BookedRooms br ON b.bookingID = br.bookingID
+                JOIN Room r ON br.roomID = r.roomID
+                JOIN RoomType rt ON r.typeID = rt.typeID
+                WHERE p.paymentID = ? AND p.payment_status = 'pending'
+            """;
+            PreparedStatement amountPstmt = conn.prepareStatement(amountQuery);
+            amountPstmt.setInt(1, paymentId);
+            ResultSet rs = amountPstmt.executeQuery();
+     
+            if (!rs.next()) {
+                JOptionPane.showMessageDialog(null, "Payment not found or already processed.");
+                return;
+            }
+     
+            double basePrice = rs.getDouble("price_per_night");
+            int stayDuration = rs.getInt("stay_duration");
+            double totalAmount = basePrice * stayDuration;
             
-            System.out.print("Enter transaction ID: ");
-            String transactionId = scanner.nextLine();
-            
-            System.out.print("Enter payment method: ");
-            String paymentMethod = scanner.nextLine();
+            String transactionId = JOptionPane.showInputDialog("Enter transaction ID:");
+            String paymentMethod = JOptionPane.showInputDialog("Enter payment method (credit_card/debit_card/cash/bank_transfer):");
             
             String query = """
                 UPDATE Payment 
                 SET payment_status = 'confirmed',
                     transactionID = ?,
                     payment_date = CURRENT_DATE,
-                    payment_method = ?
+                    payment_method = ?,
+                    payment_amount = ?
                 WHERE paymentID = ? AND payment_status = 'pending'
             """;
             
             PreparedStatement pstmt = conn.prepareStatement(query);
             pstmt.setString(1, transactionId);
             pstmt.setString(2, paymentMethod);
-            pstmt.setInt(3, paymentId);
+            pstmt.setDouble(3, totalAmount);
+            pstmt.setInt(4, paymentId);
             
             int updated = pstmt.executeUpdate();
             if (updated > 0) {
-                System.out.println("Payment processed successfully!");
+                JOptionPane.showMessageDialog(null, String.format("Payment processed successfully!\nTotal Amount: $%.2f", totalAmount));
             } else {
-                System.out.println("Payment not found or already processed.");
+                JOptionPane.showMessageDialog(null, "Payment not found or already processed.");
             }
         } catch (Exception e) {
-            System.out.println("Error processing payment: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error processing payment: " + e.getMessage());
         }
-    }
+     }
 
     private static void modifyBooking(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter booking ID to modify: ");
-            int bookingId = Integer.parseInt(scanner.nextLine());
+            String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to modify:");
+            int bookingId = Integer.parseInt(bookingIdStr);
+            
+            String receptionistIdStr = JOptionPane.showInputDialog("Enter receptionist ID handling this booking:");
+            Integer receptionistId = receptionistIdStr.isEmpty() ? null : Integer.parseInt(receptionistIdStr);
             
             // Show current booking details
-            System.out.println("Leave blank if no change is needed for the following fields:");
+            JOptionPane.showMessageDialog(null, "Leave blank if no change is needed for the following fields:");
             
-            System.out.print("Enter new guest ID: ");
-            String guestIdStr = scanner.nextLine();
+            String guestIdStr = JOptionPane.showInputDialog("Enter new guest ID:");
             Integer guestId = guestIdStr.isEmpty() ? null : Integer.parseInt(guestIdStr);
             
-            System.out.print("Enter new check-in date (YYYY-MM-DD): ");
-            String checkInDate = scanner.nextLine();
-            
-            System.out.print("Enter new check-out date (YYYY-MM-DD): ");
-            String checkOutDate = scanner.nextLine();
-            
-            System.out.print("Enter new number of guests: ");
-            String guestsStr = scanner.nextLine();
+            String checkInDate = JOptionPane.showInputDialog("Enter new check-in date (YYYY-MM-DD):");
+            String checkOutDate = JOptionPane.showInputDialog("Enter new check-out date (YYYY-MM-DD):");
+            String guestsStr = JOptionPane.showInputDialog("Enter new number of guests:");
             Integer numberOfGuests = guestsStr.isEmpty() ? null : Integer.parseInt(guestsStr);
-            
-            System.out.print("Enter new status (pending/confirmed): ");
-            String status = scanner.nextLine();
+            String status = JOptionPane.showInputDialog("Enter new status (pending/confirmed):");
             
             String query = """
                 UPDATE Booking b
@@ -170,7 +192,8 @@ public class ReceptionistOperations {
                     b.check_in_date = COALESCE(?, b.check_in_date),
                     b.check_out_date = COALESCE(?, b.check_out_date),
                     b.number_of_guests = COALESCE(?, b.number_of_guests),
-                    mb.status = COALESCE(?, mb.status)
+                    mb.status = COALESCE(?, mb.status),
+                    mb.receptionistID = COALESCE(?, mb.receptionistID)
                 WHERE b.bookingID = ?
                 AND mb.status NOT IN ('checked_in', 'checked_out')
             """;
@@ -181,25 +204,37 @@ public class ReceptionistOperations {
             pstmt.setString(3, checkOutDate.isEmpty() ? null : checkOutDate);
             pstmt.setObject(4, numberOfGuests);
             pstmt.setString(5, status.isEmpty() ? null : status);
-            pstmt.setInt(6, bookingId);
+            pstmt.setObject(6, receptionistId);  // Allow null if empty string entered
+            pstmt.setInt(7, bookingId);
             
             int updated = pstmt.executeUpdate();
+
+            // If status is changed to cancelled, delete BookedRooms entries
+            //if (!status.isEmpty() && status.equalsIgnoreCase("cancelled")) {
+            //    String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
+            //    pstmt = conn.prepareStatement(deleteBookedRooms);
+            //    pstmt.setInt(1, bookingId);
+            //    pstmt.executeUpdate();
+            //}
+            //conn.commit();
             if (updated > 0) {
-                System.out.println("Booking modified successfully!");
+                JOptionPane.showMessageDialog(null, "Booking modified successfully!");
             } else {
-                System.out.println("Booking not found or cannot be modified.");
+                JOptionPane.showMessageDialog(null, "Booking not found or cannot be modified.");
             }
         } catch (Exception e) {
-            System.out.println("Error modifying booking: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error modifying booking: " + e.getMessage());
         }
+        
     }
 
     private static void deleteBooking(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter booking ID to delete: ");
-            int bookingId = Integer.parseInt(scanner.nextLine());
-            
             conn.setAutoCommit(false);
+
+            String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to delete:");
+            int bookingId = Integer.parseInt(bookingIdStr);
+            
             
             // Check if payment is confirmed
             String checkPayment = """
@@ -214,7 +249,7 @@ public class ReceptionistOperations {
             ResultSet rs = pstmt.executeQuery();
             
             if (rs.next() && rs.getInt(1) > 0) {
-                System.out.println("Cannot delete booking: Payment is already confirmed");
+                JOptionPane.showMessageDialog(null, "Cannot delete booking: Payment is already confirmed");
                 conn.rollback();
                 return;
             }
@@ -233,14 +268,14 @@ public class ReceptionistOperations {
             int deleted = pstmt.executeUpdate();
             if (deleted > 0) {
                 conn.commit();
-                System.out.println("Booking deleted successfully!");
+                JOptionPane.showMessageDialog(null, "Booking deleted successfully!");
             } else {
                 conn.rollback();
-                System.out.println("Booking not found.");
+                JOptionPane.showMessageDialog(null, "Booking not found.");
             }
         } catch (Exception e) {
             conn.rollback();
-            System.out.println("Error deleting booking: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error deleting booking: " + e.getMessage());
         } finally {
             conn.setAutoCommit(true);
         }
@@ -255,7 +290,7 @@ public class ReceptionistOperations {
                     B.booking_date, MB.status AS booking_status, 
                     R.room_no, RT.type_name AS room_type 
                 FROM Booking B 
-                JOIN Guest G ON B.guestID = G.guestID 
+                JOIN Guest G ON B.guestID = G.userID 
                 LEFT JOIN ManagedBy MB ON B.bookingID = MB.bookingID 
                 LEFT JOIN BookedRooms BR ON B.bookingID = BR.bookingID 
                 LEFT JOIN Room R ON BR.roomID = R.roomID
@@ -266,13 +301,13 @@ public class ReceptionistOperations {
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(query);
             
-            System.out.println("\nAll Bookings:");
-            System.out.printf("%-8s %-20s %-15s %-12s %-12s %-8s %-15s %-10s %-15s%n",
-                "ID", "Guest Info", "Room", "Check In", "Check Out", "Guests", "Status", "Type", "Nationality");
-            System.out.println("-".repeat(120));
+            StringBuilder output = new StringBuilder("\nAll Bookings:\n");
+            output.append(String.format("%-8s %-20s %-15s %-12s %-12s %-8s %-15s %-10s %-15s%n",
+                "ID", "Guest Info", "Room", "Check In", "Check Out", "Guests", "Status", "Type", "Nationality"));
+            output.append("-".repeat(120)).append("\n");
             
             while (rs.next()) {
-                System.out.printf("%-8d %-20s %-15s %-12s %-12s %-8d %-15s %-10s %-15s%n",
+                output.append(String.format("%-8d %-20s %-15s %-12s %-12s %-8d %-15s %-10s %-15s%n",
                     rs.getInt("bookingID"),
                     String.format("[%d] %s", rs.getInt("guestID"), rs.getString("passport_number")),
                     rs.getString("room_no"),
@@ -281,26 +316,26 @@ public class ReceptionistOperations {
                     rs.getInt("number_of_guests"),
                     rs.getString("booking_status"),
                     rs.getString("room_type"),
-                    rs.getString("nationality"));
+                    rs.getString("nationality")));
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing bookings: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing bookings: " + e.getMessage());
         }
     }
 
     private static void assignHousekeepingTask(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter room ID: ");
-            int roomId = Integer.parseInt(scanner.nextLine());
+            String roomIdStr = JOptionPane.showInputDialog("Enter room ID:");
+            int roomId = Integer.parseInt(roomIdStr);
             
-            System.out.print("Enter housekeeper ID: ");
-            int housekeeperId = Integer.parseInt(scanner.nextLine());
+            String housekeeperIdStr = JOptionPane.showInputDialog("Enter housekeeper ID:");
+            int housekeeperId = Integer.parseInt(housekeeperIdStr);
             
-            System.out.print("Enter receptionist ID: ");
-            int receptionistId = Integer.parseInt(scanner.nextLine());
+            String receptionistIdStr = JOptionPane.showInputDialog("Enter receptionist ID:");
+            int receptionistId = Integer.parseInt(receptionistIdStr);
             
-            System.out.print("Enter scheduled time (YYYY-MM-DD HH:MM:SS): ");
-            String scheduledTime = scanner.nextLine();
+            String scheduledTime = JOptionPane.showInputDialog("Enter scheduled time (YYYY-MM-DD HH:MM:SS):");
             
             // Generate new schedule ID
             Statement stmt = conn.createStatement();
@@ -321,10 +356,10 @@ public class ReceptionistOperations {
             pstmt.setString(5, scheduledTime);
             
             pstmt.executeUpdate();
-            System.out.println("Housekeeping task assigned successfully! Schedule ID: " + scheduleId);
+            JOptionPane.showMessageDialog(null, "Housekeeping task assigned successfully! Schedule ID: " + scheduleId);
             
         } catch (Exception e) {
-            System.out.println("Error assigning housekeeping task: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error assigning housekeeping task: " + e.getMessage());
         }
     }
 
@@ -349,22 +384,23 @@ public class ReceptionistOperations {
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(query);
             
-            System.out.println("\nHousekeepers Status:");
-            System.out.printf("%-8s %-20s %-10s %-15s %-15s %-20s%n",
-                "ID", "Name", "Shift", "Tasks", "Status", "Next Task");
-            System.out.println("-".repeat(90));
+            StringBuilder output = new StringBuilder("\nHousekeepers Status:\n");
+            output.append(String.format("%-8s %-20s %-10s %-15s %-15s %-20s%n",
+                "ID", "Name", "Shift", "Tasks", "Status", "Next Task"));
+            output.append("-".repeat(90)).append("\n");
             
             while (rs.next()) {
-                System.out.printf("%-8d %-20s %-10s %-15d %-15s %-20s%n",
+                output.append(String.format("%-8d %-20s %-10s %-15d %-15s %-20s%n",
                     rs.getInt("housekeeperID"),
                     rs.getString("first_name") + " " + rs.getString("last_name"),
                     rs.getString("shift"),
                     rs.getInt("assigned_tasks"),
                     rs.getString("availability"),
-                    rs.getTimestamp("next_task_time"));
+                    rs.getTimestamp("next_task_time")));
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing housekeeper records: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing housekeeper records: " + e.getMessage());
         }
     }
 } 

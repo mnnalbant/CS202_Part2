@@ -1,12 +1,9 @@
 // GuestOperations.java
 import java.sql.*;
-import java.util.Scanner;
-//import java.time.LocalDate;
-//import java.time.format.DateTimeFormatter;
-//import java.time.format.DateTimeParseException;
+import javax.swing.*;
+
 
 public class GuestOperations {
-    private static final Scanner scanner = new Scanner(System.in);
     
     public static void handleGuestChoice(int choice, Connection conn) throws SQLException {
         switch (choice) {
@@ -23,32 +20,33 @@ public class GuestOperations {
                 cancelBooking(conn);
                 break;
             default:
-                System.out.println("Invalid choice");
+                JOptionPane.showMessageDialog(null, "Invalid choice");
         }
     }
-
     private static void addNewBooking(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter guest ID: ");
-            int guestId = Integer.parseInt(scanner.nextLine());
-            
-            System.out.print("Enter check-in date (YYYY-MM-DD): ");
-            String checkInDate = scanner.nextLine();
-            
-            System.out.print("Enter check-out date (YYYY-MM-DD): ");
-            String checkOutDate = scanner.nextLine();
-            
-            System.out.print("Enter number of guests: ");
-            int numberOfGuests = Integer.parseInt(scanner.nextLine());
-            
-            // Generate a new booking ID (you might want to implement a better way)
+            conn.setAutoCommit(false);
+
+            String guestIdStr = JOptionPane.showInputDialog("Enter guest ID:");
+            int guestId = Integer.parseInt(guestIdStr);
+    
+            String numberOfRoomsStr = JOptionPane.showInputDialog("Enter number of rooms to book:");
+            int numberOfRooms = Integer.parseInt(numberOfRoomsStr);
+    
+            String checkInDate = JOptionPane.showInputDialog("Enter check-in date (YYYY-MM-DD):");
+            String checkOutDate = JOptionPane.showInputDialog("Enter check-out date (YYYY-MM-DD):");
+            String numberOfGuestsStr = JOptionPane.showInputDialog("Enter total number of guests:");
+            int numberOfGuests = Integer.parseInt(numberOfGuestsStr);
+    
+            // Generate a new booking ID
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery("SELECT MAX(bookingID) + 1 FROM Booking");
             int bookingId = rs.next() ? rs.getInt(1) : 1;
-            
-            // Start transaction
-            conn.setAutoCommit(false);
-            
+    
+            // Generate a new payment ID
+            rs = stmt.executeQuery("SELECT MAX(paymentID) + 1 FROM Payment");
+            int paymentId = rs.next() ? rs.getInt(1) : 1;
+    
             // Insert booking
             String insertBooking = "INSERT INTO Booking (bookingID, guestID, check_in_date, check_out_date, booking_date, number_of_guests) VALUES (?, ?, ?, ?, CURRENT_DATE, ?)";
             PreparedStatement pstmt = conn.prepareStatement(insertBooking);
@@ -58,19 +56,40 @@ public class GuestOperations {
             pstmt.setString(4, checkOutDate);
             pstmt.setInt(5, numberOfGuests);
             pstmt.executeUpdate();
-            
+    
             // Insert into ManagedBy
             String insertManagedBy = "INSERT INTO ManagedBy (bookingID, receptionistID, status) VALUES (?, NULL, 'pending')";
             pstmt = conn.prepareStatement(insertManagedBy);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
+    
+            // Insert multiple rooms into BookedRooms
+            String insertBookedRooms = "INSERT INTO BookedRooms (roomID, bookingID) VALUES (?, ?)";
+            pstmt = conn.prepareStatement(insertBookedRooms);
             
+            // Loop to handle multiple room bookings
+            for (int i = 0; i < numberOfRooms; i++) {
+                String roomIdStr = JOptionPane.showInputDialog("Enter room ID for room " + (i + 1) + " of " + numberOfRooms + ":");
+                int roomId = Integer.parseInt(roomIdStr);
+                
+                pstmt.setInt(1, roomId);
+                pstmt.setInt(2, bookingId);
+                pstmt.executeUpdate();
+            }
+    
+            // Insert initial payment record with pending status only
+            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')";
+            pstmt = conn.prepareStatement(insertPayment);
+            pstmt.setInt(1, paymentId);
+            pstmt.setInt(2, bookingId);
+            pstmt.executeUpdate();
+    
             conn.commit();
-            System.out.println("Booking created successfully! Booking ID: " + bookingId);
-            
+            JOptionPane.showMessageDialog(null, "Booking created successfully!\nBooking ID: " + bookingId + "\nPayment ID: " + paymentId + "\nNumber of rooms booked: " + numberOfRooms);
+    
         } catch (Exception e) {
             conn.rollback();
-            System.out.println("Error creating booking: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error creating booking: " + e.getMessage());
         } finally {
             conn.setAutoCommit(true);
         }
@@ -78,11 +97,9 @@ public class GuestOperations {
 
     private static void viewAvailableRooms(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter check-in date (YYYY-MM-DD): ");
-            String checkInDate = scanner.nextLine();
-            System.out.print("Enter check-out date (YYYY-MM-DD): ");
-            String checkOutDate = scanner.nextLine();
-            
+            String checkInDate = JOptionPane.showInputDialog("Enter check-in date (YYYY-MM-DD):");
+            String checkOutDate = JOptionPane.showInputDialog("Enter check-out date (YYYY-MM-DD):");
+
             String query = """
                 SELECT DISTINCT
                     r.roomID, h.hotel_name, h.address, h.rating,
@@ -96,7 +113,7 @@ public class GuestOperations {
                     FROM BookedRooms br
                     JOIN Booking b ON br.bookingID = b.bookingID
                     JOIN ManagedBy mb ON b.bookingID = mb.bookingID
-                    WHERE mb.status NOT IN ('denied', 'canceled')
+                    WHERE mb.status NOT IN ('denied', 'cancelled')
                     AND (
                         (b.check_in_date BETWEEN ? AND ?)
                         OR (b.check_out_date BETWEEN ? AND ?)
@@ -105,40 +122,43 @@ public class GuestOperations {
                 )
                 ORDER BY rt.price_per_night
             """;
-            
+
             PreparedStatement pstmt = conn.prepareStatement(query);
             pstmt.setString(1, checkInDate);
             pstmt.setString(2, checkOutDate);
             pstmt.setString(3, checkInDate);
             pstmt.setString(4, checkOutDate);
             pstmt.setString(5, checkInDate);
-            
+
             ResultSet rs = pstmt.executeQuery();
-            
-            System.out.println("\nAvailable Rooms:");
-            System.out.printf("%-8s %-20s %-10s %-15s %-10s %-8s%n", 
-                "Room ID", "Hotel", "Room No", "Type", "Capacity", "Price");
-            System.out.println("-".repeat(80));
-            
+
+            StringBuilder output = new StringBuilder("\nAvailable Rooms:\n");
+            output.append(String.format("%-8s %-20s %-10s %-15s %-10s %-8s%n", 
+                "Room ID", "Hotel", "Room No", "Type", "Capacity", "Price"));
+            output.append("-".repeat(80)).append("\n");
+
             while (rs.next()) {
-                System.out.printf("%-8d %-20s %-10s %-15s %-10d $%.2f%n",
+                output.append(String.format("%-8d %-20s %-10s %-15s %-10d $%.2f%n",
                     rs.getInt("roomID"),
                     rs.getString("hotel_name"),
                     rs.getString("room_no"),
                     rs.getString("type_name"),
                     rs.getInt("base_capacity"),
-                    rs.getDouble("price_per_night"));
+                    rs.getDouble("price_per_night")));
             }
+
+            JOptionPane.showMessageDialog(null, output.toString());
+
         } catch (Exception e) {
-            System.out.println("Error viewing available rooms: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing available rooms: " + e.getMessage());
         }
     }
 
     private static void viewMyBookings(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter your guest ID: ");
-            int guestId = Integer.parseInt(scanner.nextLine());
-            
+            String guestIdStr = JOptionPane.showInputDialog("Enter your guest ID:");
+            int guestId = Integer.parseInt(guestIdStr);
+    
             String query = """
                 SELECT 
                     b.bookingID,
@@ -149,13 +169,13 @@ public class GuestOperations {
                     b.check_out_date,
                     b.booking_date,
                     b.number_of_guests,
-                    p.payment_status
+                    COALESCE(p.payment_status, 'Unpaid') as payment_status
                 FROM Booking b
                 JOIN BookedRooms br ON b.bookingID = br.bookingID
                 JOIN Room r ON br.roomID = r.roomID
                 JOIN Hotel h ON r.hotelID = h.hotelID
                 JOIN RoomType rt ON r.typeID = rt.typeID
-                JOIN Payment p ON b.bookingID = p.bookingID
+                LEFT JOIN Payment p ON b.bookingID = p.bookingID
                 WHERE b.guestID = ?
                 GROUP BY 
                     b.bookingID,
@@ -167,18 +187,18 @@ public class GuestOperations {
                     p.payment_status
                 ORDER BY b.check_in_date DESC
             """;
-            
+    
             PreparedStatement pstmt = conn.prepareStatement(query);
             pstmt.setInt(1, guestId);
             ResultSet rs = pstmt.executeQuery();
-            
-            System.out.println("\nYour Bookings:");
-            System.out.printf("%-8s %-20s %-15s %-15s %-12s %-12s %-8s %-10s%n",
-                "ID", "Hotel", "Rooms", "Room Types", "Check In", "Check Out", "Guests", "Status");
-            System.out.println("-".repeat(100));
-            
+    
+            StringBuilder output = new StringBuilder("\nYour Bookings:\n");
+            output.append(String.format("%-8s %-20s %-15s %-15s %-12s %-12s %-8s %-10s%n",
+                "ID", "Hotel", "Rooms", "Room Types", "Check In", "Check Out", "Guests", "Status"));
+            output.append("-".repeat(100)).append("\n");
+    
             while (rs.next()) {
-                System.out.printf("%-8d %-20s %-15s %-15s %-12s %-12s %-8d %-10s%n",
+                output.append(String.format("%-8d %-20s %-15s %-15s %-12s %-12s %-8d %-10s%n",
                     rs.getInt("bookingID"),
                     rs.getString("hotel_name"),
                     rs.getString("booked_rooms"),
@@ -186,26 +206,28 @@ public class GuestOperations {
                     rs.getDate("check_in_date"),
                     rs.getDate("check_out_date"),
                     rs.getInt("number_of_guests"),
-                    rs.getString("payment_status"));
+                    rs.getString("payment_status")));
             }
-            
+    
+            JOptionPane.showMessageDialog(null, output.toString());
+    
         } catch (Exception e) {
-            System.out.println("Error viewing bookings: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing bookings: " + e.getMessage());
         }
     }
-
+    
     private static void cancelBooking(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter your guest ID: ");
-            int guestId = Integer.parseInt(scanner.nextLine());
-            
-            System.out.print("Enter booking ID to cancel: ");
-            int bookingId = Integer.parseInt(scanner.nextLine());
-            
             // Start transaction
             conn.setAutoCommit(false);
-            
-            // Check if booking exists and can be canceled
+            String guestIdStr = JOptionPane.showInputDialog("Enter your guest ID:");
+            int guestId = Integer.parseInt(guestIdStr);
+
+            String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to cancel:");
+            int bookingId = Integer.parseInt(bookingIdStr);
+
+
+            // Check if booking exists and can be cancelled
             String checkQuery = """
                 SELECT b.bookingID 
                 FROM Booking b
@@ -214,24 +236,24 @@ public class GuestOperations {
                 AND b.guestID = ?
                 AND mb.status IN ('pending', 'confirmed')
             """;
-            
+
             PreparedStatement pstmt = conn.prepareStatement(checkQuery);
             pstmt.setInt(1, bookingId);
             pstmt.setInt(2, guestId);
             ResultSet rs = pstmt.executeQuery();
-            
+
             if (!rs.next()) {
-                System.out.println("Booking not found or cannot be canceled.");
+                JOptionPane.showMessageDialog(null, "Booking not found or cannot be cancelled.");
                 conn.rollback();
                 return;
             }
-            
+
             // Update ManagedBy status
-            String updateManagedBy = "UPDATE ManagedBy SET status = 'canceled' WHERE bookingID = ?";
+            String updateManagedBy = "UPDATE ManagedBy SET status = 'cancelled' WHERE bookingID = ?";
             pstmt = conn.prepareStatement(updateManagedBy);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
-            
+
             // Update Payment status
             String updatePayment = """
                 UPDATE Payment
@@ -242,19 +264,19 @@ public class GuestOperations {
             pstmt = conn.prepareStatement(updatePayment);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
-            
-            // Delete BookedRooms entries
-            String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
-            pstmt = conn.prepareStatement(deleteBookedRooms);
-            pstmt.setInt(1, bookingId);
-            pstmt.executeUpdate();
-            
+
+            // Delete BookedRooms entries (we may not need this)
+           // String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
+           // pstmt = conn.prepareStatement(deleteBookedRooms);
+            //pstmt.setInt(1, bookingId);
+            //pstmt.executeUpdate();
+
             conn.commit();
-            System.out.println("Booking canceled successfully!");
-            
+            JOptionPane.showMessageDialog(null, "Booking cancelled successfully!");
+
         } catch (Exception e) {
             conn.rollback();
-            System.out.println("Error canceling booking: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error canceling booking: " + e.getMessage());
         } finally {
             conn.setAutoCommit(true);
         }
