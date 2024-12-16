@@ -16,3 +16,9 @@ Meanwhile, the compiled output files will be generated in the `bin` folder by de
 ## Dependency Management
 
 The `JAVA PROJECTS` view allows you to manage your dependencies. More details can be found [here](https://github.com/microsoft/vscode-java-dependency#manage-dependencies).
+
+## How To Run
+
+1. Create your database by running the file "DDL.sql"
+2. Set the password in config.properties file to your root user password
+3. Run the App.java

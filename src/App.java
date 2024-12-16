@@ -1,15 +1,30 @@
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.Properties;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 public class App {
     public static void main(String[] args) {
-        // Database connection parameters
-        String url = "jdbc:mysql://localhost:3306/test";
-        String username = "root";
-        String password = "password";
+
+        // Loading in properties(config)
+        Properties properties = new Properties();
+        try (InputStream input = new FileInputStream("config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return; // Exit if properties file cannot be loaded
+        }
+
+        // Database connection parameters from properties
+        String url = properties.getProperty("db.url");
+        String username = properties.getProperty("db.username");
+        String password = properties.getProperty("db.password");
+        
         
         try {
             // Register JDBC driver
