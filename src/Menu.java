@@ -1,5 +1,6 @@
 import java.sql.*;
 import javax.swing.*;
+import java.awt.FlowLayout;
 
 public class Menu {
     private static JFrame frame;
@@ -8,6 +9,7 @@ public class Menu {
         SwingUtilities.invokeLater(() -> {
             frame = new JFrame("Hotel Management System");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setLayout(new FlowLayout());
             showMainMenu();
             frame.pack();
             frame.setVisible(true);
@@ -45,6 +47,7 @@ public class Menu {
         frame.getContentPane().add(panel);
         frame.revalidate();
         frame.repaint();
+        frame.pack();
     }
     
     private static void showAdminOptions() {
@@ -81,6 +84,7 @@ public class Menu {
         frame.getContentPane().add(panel);
         frame.revalidate();
         frame.repaint();
+        frame.pack();
     }
     
     private static void showGuestOptions() {
@@ -111,6 +115,7 @@ public class Menu {
         frame.getContentPane().add(panel);
         frame.revalidate();
         frame.repaint();
+        frame.pack();
     }
     
     private static void showReceptionistOptions() {
@@ -144,6 +149,7 @@ public class Menu {
         frame.getContentPane().add(panel);
         frame.revalidate();
         frame.repaint();
+        frame.pack();
     }
     
     private static void showHousekeepingOptions() {
@@ -174,6 +180,7 @@ public class Menu {
         frame.getContentPane().add(panel);
         frame.revalidate();
         frame.repaint();
+        frame.pack();
     }
     
     private static void handleAdminChoice(int choice) {
