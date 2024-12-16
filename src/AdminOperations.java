@@ -1,11 +1,7 @@
 import java.sql.*;
-import java.util.Scanner;
-//import java.time.LocalDate;
-//import java.time.format.DateTimeFormatter;
-//import java.time.format.DateTimeParseException;
+import javax.swing.*;
 
 public class AdminOperations {
-    private static final Scanner scanner = new Scanner(System.in);
 
     public static void handleAdminChoice(int choice, Connection conn) throws SQLException {
         switch (choice) {
@@ -40,20 +36,18 @@ public class AdminOperations {
                 viewAllEmployees(conn);
                 break;
             default:
-                System.out.println("Invalid choice");
+                JOptionPane.showMessageDialog(null, "Invalid choice");
         }
     }
 
     private static void addRoom(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter hotel ID: ");
-            int hotelId = Integer.parseInt(scanner.nextLine());
+            String hotelIdStr = JOptionPane.showInputDialog("Enter hotel ID:");
+            int hotelId = Integer.parseInt(hotelIdStr);
 
-            System.out.print("Enter room number: ");
-            String roomNo = scanner.nextLine();
-
-            System.out.print("Enter room type ID: ");
-            int typeId = Integer.parseInt(scanner.nextLine());
+            String roomNo = JOptionPane.showInputDialog("Enter room number:");
+            String typeIdStr = JOptionPane.showInputDialog("Enter room type ID:");
+            int typeId = Integer.parseInt(typeIdStr);
 
             // Generate new room ID
             Statement stmt = conn.createStatement();
@@ -68,17 +62,17 @@ public class AdminOperations {
             pstmt.setInt(4, typeId);
 
             pstmt.executeUpdate();
-            System.out.println("Room added successfully! Room ID: " + roomId);
+            JOptionPane.showMessageDialog(null, "Room added successfully! Room ID: " + roomId);
 
         } catch (Exception e) {
-            System.out.println("Error adding room: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error adding room: " + e.getMessage());
         }
     }
 
     private static void deleteRoom(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter room ID to delete: ");
-            int roomId = Integer.parseInt(scanner.nextLine());
+            String roomIdStr = JOptionPane.showInputDialog("Enter room ID to delete:");
+            int roomId = Integer.parseInt(roomIdStr);
             
             conn.setAutoCommit(false);
             
@@ -98,7 +92,7 @@ public class AdminOperations {
             ResultSet rs = pstmt.executeQuery();
             
             if (rs.next() && rs.getInt("future_bookings") > 0) {
-                System.out.println("Cannot delete room: There are future bookings for this room.");
+                JOptionPane.showMessageDialog(null, "Cannot delete room: There are future bookings for this room.");
                 conn.rollback();
                 return;
             }
@@ -111,14 +105,14 @@ public class AdminOperations {
             
             if (updated > 0) {
                 conn.commit();
-                System.out.println("Room marked as deleted successfully!");
+                JOptionPane.showMessageDialog(null, "Room marked as deleted successfully!");
             } else {
-                System.out.println("Room not found.");
+                JOptionPane.showMessageDialog(null, "Room not found.");
                 conn.rollback();
             }
         } catch (Exception e) {
             conn.rollback();
-            System.out.println("Error deleting room: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error deleting room: " + e.getMessage());
         } finally {
             conn.setAutoCommit(true);
         }
@@ -126,15 +120,13 @@ public class AdminOperations {
 
     private static void manageRoomStatus(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter room ID: ");
-            int roomId = Integer.parseInt(scanner.nextLine());
+            String roomIdStr = JOptionPane.showInputDialog("Enter room ID:");
+            int roomId = Integer.parseInt(roomIdStr);
             
-            System.out.println("Available statuses: available, maintenance, cleaning, occupied");
-            System.out.print("Enter new status: ");
-            String newStatus = scanner.nextLine().toLowerCase();
+            String newStatus = JOptionPane.showInputDialog("Enter new status (available, maintenance, cleaning, occupied):");
             
             if (!isValidStatus(newStatus)) {
-                System.out.println("Invalid status. Please use one of the available options.");
+                JOptionPane.showMessageDialog(null, "Invalid status. Please use one of the available options.");
                 return;
             }
             
@@ -145,36 +137,27 @@ public class AdminOperations {
             
             int updated = pstmt.executeUpdate();
             if (updated > 0) {
-                System.out.println("Room status updated successfully!");
+                JOptionPane.showMessageDialog(null, "Room status updated successfully!");
             } else {
-                System.out.println("Room not found.");
+                JOptionPane.showMessageDialog(null, "Room not found.");
             }
         } catch (Exception e) {
-            System.out.println("Error updating room status: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error updating room status: " + e.getMessage());
         }
     }
 
     private static void addUserAccount(Connection conn) throws SQLException {
         try {
-            System.out.println("Select user type to add:");
-            System.out.println("1. Guest");
-            System.out.println("2. Receptionist");
-            System.out.println("3. Housekeeper");
-            int userType = Integer.parseInt(scanner.nextLine());
+            String userTypeStr = JOptionPane.showInputDialog("Select user type to add:\n1. Guest\n2. Receptionist\n3. Housekeeper");
+            int userType = Integer.parseInt(userTypeStr);
             
             // Common user information
-            System.out.print("Enter username: ");
-            String username = scanner.nextLine();
-            System.out.print("Enter password: ");
-            String password = scanner.nextLine();
-            System.out.print("Enter first name: ");
-            String firstName = scanner.nextLine();
-            System.out.print("Enter last name: ");
-            String lastName = scanner.nextLine();
-            System.out.print("Enter email: ");
-            String email = scanner.nextLine();
-            System.out.print("Enter phone number: ");
-            String phoneNumber = scanner.nextLine();
+            String username = JOptionPane.showInputDialog("Enter username:");
+            String password = JOptionPane.showInputDialog("Enter password:");
+            String firstName = JOptionPane.showInputDialog("Enter first name:");
+            String lastName = JOptionPane.showInputDialog("Enter last name:");
+            String email = JOptionPane.showInputDialog("Enter email:");
+            String phoneNumber = JOptionPane.showInputDialog("Enter phone number:");
             
             conn.setAutoCommit(false);
             
@@ -183,19 +166,26 @@ public class AdminOperations {
             ResultSet rs = stmt.executeQuery("SELECT MAX(userID) + 1 FROM User");
             int userId = rs.next() ? rs.getInt(1) : 1;
             
-            String userTypeStr = switch (userType) {
-                case 1 -> "guest";
-                case 2 -> "receptionist";
-                case 3 -> "housekeeper";
-                default -> throw new IllegalArgumentException("Invalid user type");
-            };
+            String userTypeString;
+            switch (userType) {
+                case 1:
+                    userTypeString = "guest";
+                    break;
+                case 2:
+                    userTypeString = "receptionist";
+                    break;
+                case 3:
+                    userTypeString = "housekeeper";
+                    break;
+                default:
+                    throw new IllegalArgumentException("Invalid user type");
+            }
             
             // Insert into User table
             String insertUser = """
                 INSERT INTO User (userID, username, password, first_name, last_name, 
                                 email, phone_number, user_type)
-                SELECT ?, ?, ?, ?, ?, ?, ?, ?
-                WHERE ? != 'administrator'
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
             
             PreparedStatement pstmt = conn.prepareStatement(insertUser);
@@ -206,35 +196,32 @@ public class AdminOperations {
             pstmt.setString(5, lastName);
             pstmt.setString(6, email);
             pstmt.setString(7, phoneNumber);
-            pstmt.setString(8, userTypeStr);
-            pstmt.setString(9, userTypeStr);
+            pstmt.setString(8, userTypeString);
             
             if (pstmt.executeUpdate() == 0) {
                 throw new SQLException("Failed to create user account");
             }
             
-            switch (userType) {
-                case 1 -> addGuestDetails(conn, userId);
-                case 2 -> addReceptionistDetails(conn, userId);
-                case 3 -> addHousekeeperDetails(conn, userId);
+            switch (userTypeString) {
+                case "guest" -> addGuestDetails(conn, userId);
+                case "receptionist" -> addReceptionistDetails(conn, userId);
+                case "housekeeper" -> addHousekeeperDetails(conn, userId);
             }
             
             conn.commit();
-            System.out.println("User account created successfully! User ID: " + userId);
+            JOptionPane.showMessageDialog(null, "User account created successfully! User ID: " + userId);
             
         } catch (Exception e) {
             conn.rollback();
-            System.out.println("Error creating user account: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error creating user account: " + e.getMessage());
         } finally {
             conn.setAutoCommit(true);
         }
     }
 
     private static void addGuestDetails(Connection conn, int userId) throws SQLException {
-        System.out.print("Enter passport number: ");
-        String passportNumber = scanner.nextLine();
-        System.out.print("Enter nationality: ");
-        String nationality = scanner.nextLine();
+        String passportNumber = JOptionPane.showInputDialog("Enter passport number:");
+        String nationality = JOptionPane.showInputDialog("Enter nationality:");
         
         String query = "INSERT INTO Guest (userID, passport_number, nationality) VALUES (?, ?, ?)";
         PreparedStatement pstmt = conn.prepareStatement(query);
@@ -245,10 +232,9 @@ public class AdminOperations {
     }
 
     private static void addEmployeeDetails(Connection conn, int userId) throws SQLException {
-        System.out.print("Enter hotel ID: ");
-        int hotelId = Integer.parseInt(scanner.nextLine());
-        System.out.print("Enter shift (morning/afternoon/night): ");
-        String shift = scanner.nextLine();
+        String hotelIdStr = JOptionPane.showInputDialog("Enter hotel ID:");
+        int hotelId = Integer.parseInt(hotelIdStr);
+        String shift = JOptionPane.showInputDialog("Enter shift (morning/afternoon/night):");
         
         String query = "INSERT INTO Employee (userID, hotelID, shift) VALUES (?, ?, ?)";
         PreparedStatement pstmt = conn.prepareStatement(query);
@@ -279,7 +265,6 @@ public class AdminOperations {
         return status.matches("^(available|maintenance|cleaning|occupied)$");
     }
 
-    // Implement viewing methods...
     private static void viewUserAccounts(Connection conn) throws SQLException {
         String query = """
             SELECT u.userID, u.username, u.first_name, u.last_name, u.email, 
@@ -294,13 +279,13 @@ public class AdminOperations {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
-            System.out.println("\nUser Accounts:");
-            System.out.printf("%-6s %-15s %-20s %-20s %-25s %-15s %-12s %-10s %-20s%n",
-                "ID", "Username", "First Name", "Last Name", "Email", "Phone", "Type", "Shift", "Hotel");
-            System.out.println("-".repeat(140));
+            StringBuilder output = new StringBuilder("\nUser Accounts:\n");
+            output.append(String.format("%-6s %-15s %-20s %-20s %-25s %-15s %-12s %-10s %-20s%n",
+                "ID", "Username", "First Name", "Last Name", "Email", "Phone", "Type", "Shift", "Hotel"));
+            output.append("-".repeat(140)).append("\n");
             
             while (rs.next()) {
-                System.out.printf("%-6d %-15s %-20s %-20s %-25s %-15s %-12s %-10s %-20s%n",
+                output.append(String.format("%-6d %-15s %-20s %-20s %-25s %-15s %-12s %-10s %-20s%n",
                     rs.getInt("userID"),
                     rs.getString("username"),
                     rs.getString("first_name"),
@@ -309,17 +294,16 @@ public class AdminOperations {
                     rs.getString("phone_number"),
                     rs.getString("user_type"),
                     rs.getString("shift"),
-                    rs.getString("hotel_name"));
+                    rs.getString("hotel_name")));
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         }
     }
 
     private static void generateRevenueReport(Connection conn) throws SQLException {
         try {
-            System.out.print("Enter start date (YYYY-MM-DD): ");
-            String startDate = scanner.nextLine();
-            System.out.print("Enter end date (YYYY-MM-DD): ");
-            String endDate = scanner.nextLine();
+            String startDate = JOptionPane.showInputDialog("Enter start date (YYYY-MM-DD):");
+            String endDate = JOptionPane.showInputDialog("Enter end date (YYYY-MM-DD):");
             
             String query = """
                 SELECT 
@@ -342,10 +326,10 @@ public class AdminOperations {
             pstmt.setString(2, endDate);
             ResultSet rs = pstmt.executeQuery();
             
-            System.out.println("\nRevenue Report from " + startDate + " to " + endDate);
-            System.out.printf("%-8s %-30s %-15s %-15s%n", 
-                "HotelID", "Hotel Name", "Total Bookings", "Total Revenue");
-            System.out.println("-".repeat(70));
+            StringBuilder output = new StringBuilder("\nRevenue Report from " + startDate + " to " + endDate + "\n");
+            output.append(String.format("%-8s %-30s %-15s %-15s%n", 
+                "HotelID", "Hotel Name", "Total Bookings", "Total Revenue"));
+            output.append("-".repeat(70)).append("\n");
             
             double grandTotal = 0;
             int totalBookings = 0;
@@ -356,18 +340,19 @@ public class AdminOperations {
                 grandTotal += revenue;
                 totalBookings += bookings;
                 
-                System.out.printf("%-8d %-30s %-15d $%-14.2f%n",
+                output.append(String.format("%-8d %-30s %-15d $%-14.2f%n",
                     rs.getInt("hotelID"),
                     rs.getString("hotel_name"),
                     bookings,
-                    revenue);
+                    revenue));
             }
             
-            System.out.println("-".repeat(70));
-            System.out.printf("TOTAL: %-30s %-15d $%-14.2f%n", "", totalBookings, grandTotal);
+            output.append("-".repeat(70)).append("\n");
+            output.append(String.format("TOTAL: %-30s %-15d $%-14.2f%n", "", totalBookings, grandTotal));
+            JOptionPane.showMessageDialog(null, output.toString());
             
         } catch (Exception e) {
-            System.out.println("Error generating revenue report: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error generating revenue report: " + e.getMessage());
         }
     }
 
@@ -395,13 +380,13 @@ public class AdminOperations {
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(query);
             
-            System.out.println("\nAll Booking Records:");
-            System.out.printf("%-8s %-20s %-10s %-20s %-12s %-12s %-15s %-10s%n",
-                "ID", "Guest", "Room", "Hotel", "Check In", "Check Out", "Status", "Amount");
-            System.out.println("-".repeat(110));
+            StringBuilder output = new StringBuilder("\nAll Booking Records:\n");
+            output.append(String.format("%-8s %-20s %-10s %-20s %-12s %-12s %-15s %-10s%n",
+                "ID", "Guest", "Room", "Hotel", "Check In", "Check Out", "Status", "Amount"));
+            output.append("-".repeat(110)).append("\n");
             
             while (rs.next()) {
-                System.out.printf("%-8d %-20s %-10s %-20s %-12s %-12s %-15s $%-9.2f%n",
+                output.append(String.format("%-8d %-20s %-10s %-20s %-12s %-12s %-15s $%-9.2f%n",
                     rs.getInt("bookingID"),
                     rs.getString("guest_name"),
                     rs.getString("room_no"),
@@ -409,10 +394,11 @@ public class AdminOperations {
                     rs.getDate("check_in_date"),
                     rs.getDate("check_out_date"),
                     rs.getString("payment_status"),
-                    rs.getDouble("payment_amount"));
+                    rs.getDouble("payment_amount")));
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing booking records: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing booking records: " + e.getMessage());
         }
     }
 
@@ -436,22 +422,23 @@ public class AdminOperations {
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(query);
             
-            System.out.println("\nHousekeeping Records:");
-            System.out.printf("%-8s %-10s %-20s %-20s %-20s %-10s%n",
-                "ID", "Room", "Hotel", "Housekeeper", "Scheduled Time", "Status");
-            System.out.println("-".repeat(100));
+            StringBuilder output = new StringBuilder("\nHousekeeping Records:\n");
+            output.append(String.format("%-8s %-10s %-20s %-20s %-20s %-10s%n",
+                "ID", "Room", "Hotel", "Housekeeper", "Scheduled Time", "Status"));
+            output.append("-".repeat(100)).append("\n");
             
             while (rs.next()) {
-                System.out.printf("%-8d %-10s %-20s %-20s %-20s %-10s%n",
+                output.append(String.format("%-8d %-10s %-20s %-20s %-20s %-10s%n",
                     rs.getInt("scheduleID"),
                     rs.getString("room_no"),
                     rs.getString("hotel_name"),
                     rs.getString("housekeeper_name"),
                     rs.getTimestamp("scheduled_time"),
-                    rs.getString("status"));
+                    rs.getString("status")));
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing housekeeping records: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing housekeeping records: " + e.getMessage());
         }
     }
 
@@ -476,20 +463,21 @@ public class AdminOperations {
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(query);
             
-            System.out.println("\nMost Booked Room Types:");
-            System.out.printf("%-20s %-15s %-15s %-15s%n",
-                "Room Type", "Bookings", "Capacity", "Price/Night");
-            System.out.println("-".repeat(70));
+            StringBuilder output = new StringBuilder("\nMost Booked Room Types:\n");
+            output.append(String.format("%-20s %-15s %-15s %-15s%n",
+                "Room Type", "Bookings", "Capacity", "Price/Night"));
+            output.append("-".repeat(70)).append("\n");
             
             while (rs.next()) {
-                System.out.printf("%-20s %-15d %-15d $%-14.2f%n",
+                output.append(String.format("%-20s %-15d %-15d $%-14.2f%n",
                     rs.getString("type_name"),
                     rs.getInt("booking_count"),
                     rs.getInt("base_capacity"),
-                    rs.getDouble("price_per_night"));
+                    rs.getDouble("price_per_night")));
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing room types: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing room types: " + e.getMessage());
         }
     }
 
@@ -513,22 +501,23 @@ public class AdminOperations {
             Statement stmt = conn.createStatement();
             ResultSet rs = stmt.executeQuery(query);
             
-            System.out.println("\nEmployee List:");
-            System.out.printf("%-8s %-15s %-15s %-15s %-10s %-20s%n",
-                "ID", "First Name", "Last Name", "Role", "Shift", "Hotel");
-            System.out.println("-".repeat(90));
+            StringBuilder output = new StringBuilder("\nEmployee List:\n");
+            output.append(String.format("%-8s %-15s %-15s %-15s %-10s %-20s%n",
+                "ID", "First Name", "Last Name", "Role", "Shift", "Hotel"));
+            output.append("-".repeat(90)).append("\n");
             
             while (rs.next()) {
-                System.out.printf("%-8d %-15s %-15s %-15s %-10s %-20s%n",
+                output.append(String.format("%-8d %-15s %-15s %-15s %-10s %-20s%n",
                     rs.getInt("userID"),
                     rs.getString("first_name"),
                     rs.getString("last_name"),
                     rs.getString("user_type"),
                     rs.getString("shift"),
-                    rs.getString("hotel_name"));
+                    rs.getString("hotel_name")));
             }
+            JOptionPane.showMessageDialog(null, output.toString());
         } catch (Exception e) {
-            System.out.println("Error viewing employees: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error viewing employees: " + e.getMessage());
         }
     }
 }
