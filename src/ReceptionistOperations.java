@@ -255,7 +255,7 @@ public class ReceptionistOperations {
                     B.booking_date, MB.status AS booking_status, 
                     R.room_no, RT.type_name AS room_type 
                 FROM Booking B 
-                JOIN Guest G ON B.guestID = G.guestID 
+                JOIN Guest G ON B.guestID = G.userID 
                 LEFT JOIN ManagedBy MB ON B.bookingID = MB.bookingID 
                 LEFT JOIN BookedRooms BR ON B.bookingID = BR.bookingID 
                 LEFT JOIN Room R ON BR.roomID = R.roomID

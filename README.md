@@ -21,4 +21,4 @@ The `JAVA PROJECTS` view allows you to manage your dependencies. More details ca
 
 1. Create your database by running the file "DDL.sql"
 2. Set the password in config.properties file to your root user password
-3. Run the App.java
+3. Run the Menu.java

@@ -8,6 +8,7 @@ import java.util.Properties;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+// This is a test to check if the DB connection works
 public class App {
     public static void main(String[] args) {
 
