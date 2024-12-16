@@ -12,7 +12,8 @@ public class DatabaseConnection {
         // Load configuration from properties file
         Properties properties = new Properties();
         String configPath = System.getProperty("user.dir") + File.separator + "config.properties";
-        
+
+
         try (InputStream input = new FileInputStream(configPath)) {
             properties.load(input);
             URL = properties.getProperty("db.url");
