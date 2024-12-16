@@ -71,11 +71,10 @@ public class AdminOperations {
 
     private static void deleteRoom(Connection conn) throws SQLException {
         try {
+            conn.setAutoCommit(false);
             String roomIdStr = JOptionPane.showInputDialog("Enter room ID to delete:");
             int roomId = Integer.parseInt(roomIdStr);
-            
-            conn.setAutoCommit(false);
-            
+                        
             // Check for future bookings
             String checkBookings = """
                 SELECT COUNT(*) as future_bookings
@@ -148,6 +147,8 @@ public class AdminOperations {
 
     private static void addUserAccount(Connection conn) throws SQLException {
         try {
+            conn.setAutoCommit(false);
+
             String userTypeStr = JOptionPane.showInputDialog("Select user type to add:\n1. Guest\n2. Receptionist\n3. Housekeeper");
             int userType = Integer.parseInt(userTypeStr);
             
@@ -159,7 +160,6 @@ public class AdminOperations {
             String email = JOptionPane.showInputDialog("Enter email:");
             String phoneNumber = JOptionPane.showInputDialog("Enter phone number:");
             
-            conn.setAutoCommit(false);
             
             // Generate new user ID
             Statement stmt = conn.createStatement();

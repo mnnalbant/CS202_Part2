@@ -2,6 +2,7 @@
 import java.sql.*;
 import javax.swing.*;
 
+
 public class GuestOperations {
     
     public static void handleGuestChoice(int choice, Connection conn) throws SQLException {
@@ -24,15 +25,17 @@ public class GuestOperations {
     }
     private static void addNewBooking(Connection conn) throws SQLException {
         try {
+            conn.setAutoCommit(false);
+
             String guestIdStr = JOptionPane.showInputDialog("Enter guest ID:");
             int guestId = Integer.parseInt(guestIdStr);
     
-            String roomIdStr = JOptionPane.showInputDialog("Enter room ID:");
-            int roomId = Integer.parseInt(roomIdStr);
+            String numberOfRoomsStr = JOptionPane.showInputDialog("Enter number of rooms to book:");
+            int numberOfRooms = Integer.parseInt(numberOfRoomsStr);
     
             String checkInDate = JOptionPane.showInputDialog("Enter check-in date (YYYY-MM-DD):");
             String checkOutDate = JOptionPane.showInputDialog("Enter check-out date (YYYY-MM-DD):");
-            String numberOfGuestsStr = JOptionPane.showInputDialog("Enter number of guests:");
+            String numberOfGuestsStr = JOptionPane.showInputDialog("Enter total number of guests:");
             int numberOfGuests = Integer.parseInt(numberOfGuestsStr);
     
             // Generate a new booking ID
@@ -43,9 +46,6 @@ public class GuestOperations {
             // Generate a new payment ID
             rs = stmt.executeQuery("SELECT MAX(paymentID) + 1 FROM Payment");
             int paymentId = rs.next() ? rs.getInt(1) : 1;
-    
-            // Start transaction
-            conn.setAutoCommit(false);
     
             // Insert booking
             String insertBooking = "INSERT INTO Booking (bookingID, guestID, check_in_date, check_out_date, booking_date, number_of_guests) VALUES (?, ?, ?, ?, CURRENT_DATE, ?)";
@@ -63,12 +63,19 @@ public class GuestOperations {
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
     
-            // Insert into BookedRooms
+            // Insert multiple rooms into BookedRooms
             String insertBookedRooms = "INSERT INTO BookedRooms (roomID, bookingID) VALUES (?, ?)";
             pstmt = conn.prepareStatement(insertBookedRooms);
-            pstmt.setInt(1, roomId);
-            pstmt.setInt(2, bookingId);
-            pstmt.executeUpdate();
+            
+            // Loop to handle multiple room bookings
+            for (int i = 0; i < numberOfRooms; i++) {
+                String roomIdStr = JOptionPane.showInputDialog("Enter room ID for room " + (i + 1) + " of " + numberOfRooms + ":");
+                int roomId = Integer.parseInt(roomIdStr);
+                
+                pstmt.setInt(1, roomId);
+                pstmt.setInt(2, bookingId);
+                pstmt.executeUpdate();
+            }
     
             // Insert initial payment record with pending status only
             String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')";
@@ -78,7 +85,7 @@ public class GuestOperations {
             pstmt.executeUpdate();
     
             conn.commit();
-            JOptionPane.showMessageDialog(null, "Booking created successfully! Booking ID: " + bookingId + ", Payment ID: " + paymentId);
+            JOptionPane.showMessageDialog(null, "Booking created successfully!\nBooking ID: " + bookingId + "\nPayment ID: " + paymentId + "\nNumber of rooms booked: " + numberOfRooms);
     
         } catch (Exception e) {
             conn.rollback();
@@ -211,14 +218,14 @@ public class GuestOperations {
     
     private static void cancelBooking(Connection conn) throws SQLException {
         try {
+            // Start transaction
+            conn.setAutoCommit(false);
             String guestIdStr = JOptionPane.showInputDialog("Enter your guest ID:");
             int guestId = Integer.parseInt(guestIdStr);
 
             String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to cancel:");
             int bookingId = Integer.parseInt(bookingIdStr);
 
-            // Start transaction
-            conn.setAutoCommit(false);
 
             // Check if booking exists and can be cancelled
             String checkQuery = """

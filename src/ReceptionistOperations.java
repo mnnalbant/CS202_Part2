@@ -230,10 +230,11 @@ public class ReceptionistOperations {
 
     private static void deleteBooking(Connection conn) throws SQLException {
         try {
+            conn.setAutoCommit(false);
+
             String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to delete:");
             int bookingId = Integer.parseInt(bookingIdStr);
             
-            conn.setAutoCommit(false);
             
             // Check if payment is confirmed
             String checkPayment = """

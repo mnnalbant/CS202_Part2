@@ -116,6 +116,8 @@ public class HousekeepingOperations {
 
     private static void updateTaskStatus(Connection conn) throws SQLException {
         try {
+            conn.setAutoCommit(false);
+
             String housekeeperIdStr = JOptionPane.showInputDialog("Enter your housekeeper ID:");
             int housekeeperId = Integer.parseInt(housekeeperIdStr);
             
@@ -131,9 +133,7 @@ public class HousekeepingOperations {
                 JOptionPane.showMessageDialog(null, "Invalid schedule ID or task is not assigned to you.");
                 return;
             }
-            
-            conn.setAutoCommit(false);
-            
+                        
             String updateSchedule = """
                 UPDATE HousekeepingSchedule
                 SET status = 'complete'
