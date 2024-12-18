@@ -1,4 +1,3 @@
-// GuestOperations.java
 import java.sql.*;
 import javax.swing.*;
 
@@ -38,16 +37,13 @@ public class GuestOperations {
             String numberOfGuestsStr = JOptionPane.showInputDialog("Enter total number of guests:");
             int numberOfGuests = Integer.parseInt(numberOfGuestsStr);
     
-            // Generate a new booking ID
-            Statement stmt = conn.createStatement();
+            Statement stmt = conn.createStatement(); //new booking ID
             ResultSet rs = stmt.executeQuery("SELECT MAX(bookingID) + 1 FROM Booking");
             int bookingId = rs.next() ? rs.getInt(1) : 1;
     
-            // Generate a new payment ID
-            rs = stmt.executeQuery("SELECT MAX(paymentID) + 1 FROM Payment");
+            rs = stmt.executeQuery("SELECT MAX(paymentID) + 1 FROM Payment"); //new payment ID
             int paymentId = rs.next() ? rs.getInt(1) : 1;
     
-            // Insert booking
             String insertBooking = "INSERT INTO Booking (bookingID, guestID, check_in_date, check_out_date, booking_date, number_of_guests) VALUES (?, ?, ?, ?, CURRENT_DATE, ?)";
             PreparedStatement pstmt = conn.prepareStatement(insertBooking);
             pstmt.setInt(1, bookingId);
@@ -57,17 +53,13 @@ public class GuestOperations {
             pstmt.setInt(5, numberOfGuests);
             pstmt.executeUpdate();
     
-            // Insert into ManagedBy
             String insertManagedBy = "INSERT INTO ManagedBy (bookingID, receptionistID, status) VALUES (?, NULL, 'pending')";
             pstmt = conn.prepareStatement(insertManagedBy);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
     
-            // Insert multiple rooms into BookedRooms
-            String insertBookedRooms = "INSERT INTO BookedRooms (roomID, bookingID) VALUES (?, ?)";
+            String insertBookedRooms = "INSERT INTO BookedRooms (roomID, bookingID) VALUES (?, ?)"; //multiple rooms into BookedRooms
             pstmt = conn.prepareStatement(insertBookedRooms);
-            
-            // Loop to handle multiple room bookings
             for (int i = 0; i < numberOfRooms; i++) {
                 String roomIdStr = JOptionPane.showInputDialog("Enter room ID for room " + (i + 1) + " of " + numberOfRooms + ":");
                 int roomId = Integer.parseInt(roomIdStr);
@@ -77,8 +69,7 @@ public class GuestOperations {
                 pstmt.executeUpdate();
             }
     
-            // Insert initial payment record with pending status only
-            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')";
+            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')"; //// initial payment data w pending status only
             pstmt = conn.prepareStatement(insertPayment);
             pstmt.setInt(1, paymentId);
             pstmt.setInt(2, bookingId);
@@ -218,16 +209,13 @@ public class GuestOperations {
     
     private static void cancelBooking(Connection conn) throws SQLException {
         try {
-            // Start transaction
             conn.setAutoCommit(false);
             String guestIdStr = JOptionPane.showInputDialog("Enter your guest ID:");
             int guestId = Integer.parseInt(guestIdStr);
 
             String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to cancel:");
             int bookingId = Integer.parseInt(bookingIdStr);
-
-
-            // Check if booking exists and can be cancelled
+            
             String checkQuery = """
                 SELECT b.bookingID 
                 FROM Booking b
@@ -248,13 +236,11 @@ public class GuestOperations {
                 return;
             }
 
-            // Update ManagedBy status
             String updateManagedBy = "UPDATE ManagedBy SET status = 'cancelled' WHERE bookingID = ?";
             pstmt = conn.prepareStatement(updateManagedBy);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
 
-            // Update Payment status
             String updatePayment = """
                 UPDATE Payment
                 SET payment_status = 'refunded'
@@ -264,13 +250,14 @@ public class GuestOperations {
             pstmt = conn.prepareStatement(updatePayment);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
-
-            // Delete BookedRooms entries (we may not need this)
-           // String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
-           // pstmt = conn.prepareStatement(deleteBookedRooms);
-            //pstmt.setInt(1, bookingId);
-            //pstmt.executeUpdate();
-
+            
+            /*
+            Delete BookedRooms entries (we may not need this)
+            String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
+            pstmt = conn.prepareStatement(deleteBookedRooms);
+            pstmt.setInt(1, bookingId);
+            pstmt.executeUpdate();
+            */
             conn.commit();
             JOptionPane.showMessageDialog(null, "Booking cancelled successfully!");
 
