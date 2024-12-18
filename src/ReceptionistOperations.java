@@ -70,7 +70,6 @@ public class ReceptionistOperations {
             pstmt.setInt(5, numberOfGuests);
             pstmt.executeUpdate();
             
-            // Insert managed by record
             String insertManagedBy = """
                 INSERT INTO ManagedBy (bookingID, receptionistID, status)
                 VALUES (?, ?, 'confirmed')
@@ -80,15 +79,13 @@ public class ReceptionistOperations {
             pstmt.setInt(2, receptionistId);
             pstmt.executeUpdate();
             
-            // Insert booked room
             String insertBookedRoom = "INSERT INTO BookedRooms (roomID, bookingID) VALUES (?, ?)";
             pstmt = conn.prepareStatement(insertBookedRoom);
             pstmt.setInt(1, roomId);
             pstmt.setInt(2, bookingId);
             pstmt.executeUpdate();
             
-            // Insert initial payment record with pending status only
-            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')";
+            String insertPayment = "INSERT INTO Payment (paymentID, bookingID, payment_status) VALUES (?, ?, 'pending')"; //initial payment data w pending status only
             pstmt = conn.prepareStatement(insertPayment);
             pstmt.setInt(1, paymentId);
             pstmt.setInt(2, bookingId);
@@ -172,7 +169,6 @@ public class ReceptionistOperations {
             String receptionistIdStr = JOptionPane.showInputDialog("Enter receptionist ID handling this booking:");
             Integer receptionistId = receptionistIdStr.isEmpty() ? null : Integer.parseInt(receptionistIdStr);
             
-            // Show current booking details
             JOptionPane.showMessageDialog(null, "Leave blank if no change is needed for the following fields:");
             
             String guestIdStr = JOptionPane.showInputDialog("Enter new guest ID:");
@@ -208,15 +204,18 @@ public class ReceptionistOperations {
             pstmt.setInt(7, bookingId);
             
             int updated = pstmt.executeUpdate();
-
-            // If status is changed to cancelled, delete BookedRooms entries
-            //if (!status.isEmpty() && status.equalsIgnoreCase("cancelled")) {
-            //    String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
-            //    pstmt = conn.prepareStatement(deleteBookedRooms);
-            //    pstmt.setInt(1, bookingId);
-            //    pstmt.executeUpdate();
-            //}
-            //conn.commit();
+            
+            //If status is changed to cancelled, delete BookedRooms entries
+            /*
+            if (!status.isEmpty() && status.equalsIgnoreCase("cancelled")) {
+            String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
+            pstmt = conn.prepareStatement(deleteBookedRooms);
+            pstmt.setInt(1, bookingId);
+            pstmt.executeUpdate();
+            }
+            conn.commit();
+            */
+            
             if (updated > 0) {
                 JOptionPane.showMessageDialog(null, "Booking modified successfully!");
             } else {
@@ -235,8 +234,6 @@ public class ReceptionistOperations {
             String bookingIdStr = JOptionPane.showInputDialog("Enter booking ID to delete:");
             int bookingId = Integer.parseInt(bookingIdStr);
             
-            
-            // Check if payment is confirmed
             String checkPayment = """
                 SELECT COUNT(*) 
                 FROM Payment 
@@ -254,13 +251,11 @@ public class ReceptionistOperations {
                 return;
             }
             
-            // Delete booked rooms
             String deleteBookedRooms = "DELETE FROM BookedRooms WHERE bookingID = ?";
             pstmt = conn.prepareStatement(deleteBookedRooms);
             pstmt.setInt(1, bookingId);
             pstmt.executeUpdate();
             
-            // Delete the booking
             String deleteBooking = "DELETE FROM Booking WHERE bookingID = ?";
             pstmt = conn.prepareStatement(deleteBooking);
             pstmt.setInt(1, bookingId);
