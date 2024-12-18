@@ -96,7 +96,6 @@ public class AdminOperations {
                 return;
             }
             
-            // Mark room as deleted
             String updateRoom = "UPDATE Room SET status = 'deleted' WHERE roomID = ?";
             pstmt = conn.prepareStatement(updateRoom);
             pstmt.setInt(1, roomId);
@@ -160,9 +159,7 @@ public class AdminOperations {
             String email = JOptionPane.showInputDialog("Enter email:");
             String phoneNumber = JOptionPane.showInputDialog("Enter phone number:");
             
-            
-            // Generate new user ID
-            Statement stmt = conn.createStatement();
+            Statement stmt = conn.createStatement(); // new user ID
             ResultSet rs = stmt.executeQuery("SELECT MAX(userID) + 1 FROM User");
             int userId = rs.next() ? rs.getInt(1) : 1;
             
@@ -181,7 +178,6 @@ public class AdminOperations {
                     throw new IllegalArgumentException("Invalid user type");
             }
             
-            // Insert into User table
             String insertUser = """
                 INSERT INTO User (userID, username, password, first_name, last_name, 
                                 email, phone_number, user_type)
