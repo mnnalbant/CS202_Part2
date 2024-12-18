@@ -1,4 +1,3 @@
-// DatabaseConnection.java
 import java.sql.*;
 import java.io.*;
 import java.util.Properties;
@@ -9,8 +8,7 @@ public class DatabaseConnection {
     private static String PASSWORD;
 
     static {
-        // Load configuration from properties file
-        Properties properties = new Properties();
+        Properties properties = new Properties(); //configuration from properties file
         String configPath = System.getProperty("user.dir") + File.separator + "config.properties";
 
 
@@ -24,13 +22,9 @@ public class DatabaseConnection {
             System.err.println("Failed to load config.properties from: " + configPath);
             System.err.println("Error: " + ex.getMessage());
             
-            // Optionally set default values
             URL = "jdbc:mysql://localhost:3306/mydb";
             USER = "root";
             PASSWORD = "";
-            
-            // Or throw a runtime exception if the application cannot proceed without proper config
-            // throw new RuntimeException("Could not load configuration file", ex);
         }
     }
     public static Connection getConnection() throws SQLException {
